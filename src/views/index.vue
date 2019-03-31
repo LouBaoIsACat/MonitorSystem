@@ -73,7 +73,7 @@
         unsubscribe: function(){
             localStorage.removeItem("userName");
             localStorage.removeItem("addedProjectName");
-            localStorage.removeItem("addedDiatrictsArray");
+            localStorage.removeItem("addedDistrictsArray");
             this.isLogin = false;
             // console.log("[local-username]:", localStorage.getItem("userName"));
             this.$Notice.success({
@@ -81,9 +81,10 @@
                 duration: 1
             })
             setTimeout(() => {
-                this.$router.push({
-                    path:'/index/project'
-                })
+                // this.$router.push({
+                //     path:'/index/project'
+                // })
+                location.reload();
             }, 1000);
         }
     }
@@ -118,7 +119,7 @@
     flex:0 0 170px;
   }
   #content{
-    flex: 1 1 1100px;
+    flex: 1 1 1024px;
   }
 }
 #footer{
@@ -128,5 +129,9 @@
     position: absolute;
     bottom:-70px;
     width:100%;
+    min-width: 1024px;
+}
+.ivu-layout-header{
+  min-width: 1024px;
 }
 </style>

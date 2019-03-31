@@ -97,18 +97,15 @@ export const GetAddedNode = { // 刷新页面后重新获取项目信息
     }
 }
 
-// export const GetAddedNode = { // 刷新页面后获取节点或者打开一个以往的项目时渲染节点
-//     methods: {
-//         GetAddedNode: (projectName) => {
-//             return new Promise((resolve, rep) => {
-//                 service.get('/GetAddedNode', {
-//                     params: {
-//                         projectName: projectName
-//                     }
-//                 }).then((rep) => {
-//                     resolve(rep)
-//                 })
-//             })
-//         }
-//     }
-// }
+export const DeleteAddedNode = {
+    methods: {
+        DeleteAddedNode: (body) => {
+            return new Promise((resolve, rep) => {
+                service.post('/DeleteNode', body).then((rep) => {
+                    resolve(rep)
+                })
+            })
+        }
+    }
+}
+

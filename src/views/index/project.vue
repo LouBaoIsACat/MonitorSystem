@@ -2,7 +2,7 @@
     <div id="project">
         <Breadcrumb class="breadcrumb">
             <BreadcrumbItem><span @click="set_newProject">设置向导</span></BreadcrumbItem>
-                <Modal v-model="snp_modal" @on-ok="ok" @on-cancel="cancel" :loading="loading" title="项目配置向导">
+                <Modal v-model="snp_modal" @on-ok="ok" @on-cancel="cancel" :loading="loading" :mask-closable="false" title="项目配置向导">
                     <label>项目名称:</label>
                     <Input type="text" v-model="project_name" style="width:425px;margin-left:5px;"/><br><br>
                     <label>项目文件保存路径:</label>
@@ -17,7 +17,7 @@
                     <div id="show_project_pic" ></div>
                 </Modal>
             <BreadcrumbItem><span @click="set_addDistrict">添加区域</span></BreadcrumbItem>
-                <Modal v-model="addDistrict_modal" @on-ok="AddDistricts" @on-cancel="CancelAddDistrict" :loading="district_loading" title="添加区域向导">
+                <Modal v-model="addDistrict_modal" @on-ok="AddDistricts" @on-cancel="CancelAddDistrict" :loading="district_loading" :mask-closable="false" title="添加区域向导">
                     <label>区域编号:</label>{{added_district_id}}<br><br>
                     <label>区域名称:</label>
                     <Input type="text" v-model="added_district_name" style="width:425px;margin-left:5px;" /><br><br>
@@ -36,6 +36,7 @@
             <BreadcrumbItem>删除所有项目数据</BreadcrumbItem>
         </Breadcrumb>
         <h2 style="margin-top:5px;">项目名称：{{project_name_showing}}</h2>
+        <Button v-if="project_added_flag==1" @click="close_current_project" style="position: absolute;left: 736px;top: 42px;">关闭项目</Button>
         <div class="pic_collapse_layout">
             <div id="project_detail" v-show="project_added_flag == 1">
                 <Collapse accordion>
@@ -45,16 +46,16 @@
                     </Panel>
                     <Panel name="2">
                         结点数
-                        <p slot="content">此处为结点数</p>
+                        <p slot="content">{{added_Node_List.length}}</p>
                     </Panel>
                     <Panel name="3">
-                        区域状态
-                        <p slot="content">此处为区域状态</p>
+                        项目状态
+                        <p slot="content">{{monitor_project_state_showing}}</p>
                     </Panel>
                 </Collapse>
             </div>
             <div id="indexProPic"  @click="clickPic" @ style="cursor:pointer;">
-                <Modal v-model="pic_modal" title="添加结点向导">
+                <Modal v-model="pic_modal" :mask-closable="false" title="添加结点向导">
                     <div v-show="pic_node_show==1">
                         <p>请选择要添加的监控设备</p>
                         <Button @click="select_camera=false;select_node=true">传感器结点</Button>
@@ -118,22 +119,57 @@
         <div class="district_area_style" >
             <Card v-for="(item, index) in district_list" :key="index" style="width:250px;height:340px;margin-top:15px;margin-riht:10px;">
                 <label>区域编号:</label>{{item.addDistrictId}}<br>
-                <label>区域名称:</label>{{item.addDistrictName}}<br>
-                <label>区域备注:</label>{{item.addDistrictRemark}}<br>
+                <label>区域名称:</label>{{item.addDistrictName.length > 9 ? item.addDistrictName.substring(0,9) + '...' : item.addDistrictName}}<br>
+                <label>区域备注:</label>{{item.addDistrictRemark.length > 9 ? item.addDistrictRemark.substring(0,9) + '...' : item.addDistrictRemark}}<br>
                 <router-link tag="a" :to='{name: "district", params: {id: item.addDistrictId}}' target="_blank">查看详情>>></router-link>
                 <!-- <span style="color:blue;cursor:pointer;" @click="gotoDistrictDetail(item.addDistrictId)">详情>>></span> -->
-                <div style="width:215px;height:215px;margin:0 auto;margin-top:10px;border:1px solid #d7dde4;"></div>
+                <div :id="districtId(item.addDistrictId)" style="width:215px;height:215px;margin:0 auto;margin-top:10px;border:1px solid #d7dde4;"></div>
             </Card>
         </div> 
+        <Modal v-model="Node_Detail_Modal" :mask-closable="false">
+            <div slot="header"><h2>节点详情</h2></div>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点名称：</span>{{node_Detail.nodeName}}</p>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点编号：</span>{{node_Detail.nodeId}}</p>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点更新频率：</span>{{node_Detail.nodeUpdateFrequency}}</p>
+            <br/>
+            <table>
+                <tr>
+                    <th>传感器名称</th>
+                    <th>传感器编号</th>
+                    <th>传感器类型</th>
+                    <th>传感器监测阈值</th>
+                    <th>当前值</th>
+                </tr>
+                <tr v-for="(item,index) in node_Detail.sensorDetail" :key="index">
+                    <td>{{item.sensorName}}</td>
+                    <td>{{item.id}}</td>
+                    <td v-if='item.type=="digital"'>数据传感器</td>
+                    <td v-else>开关传感器</td>
+                    <td v-if='item.type=="digital"'>
+                        <label>最小值:</label>{{item.status.min}}<br/>
+                        <label>最大值:</label>{{item.status.max}}
+                    </td>
+                    <td v-else>
+                        <label>传感器状态:</label><span v-if='item.status==0'>OFF</span>
+                        <span v-else>ON</span>
+                    </td>
+                    <td>{{item.value}}</td>
+                </tr>
+            </table>
+            <div slot="footer">
+                <Button @click="deleteAddedNode(node_Detail.nodeId)">删除该节点</Button>
+                <Button type="primary" @click="nodeDetailModal_Ok">确定</Button>
+            </div>
+        </Modal>
         <Button @click="change_sensor_value100">改变节点传感器的值</Button>
     </div>
 </template>
 
 <script>
-import {isnull, stopBubble } from "../../common/common.js";
-import { CreateProject, CreateNode, CreateCamera, SeeNodeDetail, AddDistrict, GetProjectDetailAfterUpdate, GetAddedNode } from "../../api/index/project.js";
+import {isnull, stopBubble, copyArray } from "../../common/common.js";
+import { CreateProject, CreateNode, CreateCamera, SeeNodeDetail, AddDistrict, GetProjectDetailAfterUpdate, GetAddedNode, DeleteAddedNode } from "../../api/index/project.js";
 // import func from './vue-temp/vue-editor-bridge.js';
-let location;
+let Location, project_picture_file, district_picture_file;
 export default {
     name:"project",
     data(){
@@ -146,6 +182,7 @@ export default {
             monitor_district_remark:"",     //监测区域备注
             project_name_showing:"",       //页面显示的项目名称
             monitor_district_remark_showing:"",  //页面显示的区域备注
+            monitor_project_state_showing: " ", // 项目状态
             flag:0,               //项目向导是否有选择图片的标志
             project_added_flag: 0, // 是否已设置了项导的标志
             pic_modal:false,        //结点向导模态框
@@ -169,6 +206,9 @@ export default {
             district_list: [], // 区域列表
             added_Node_List: [], // 已添加的结点
             added_Node_List_Copy: [], // 已添加节点的数组的副本，用于记录旧值
+            Node_Detail_Modal: false, // 节点详情模态框
+            node_Detail: {}, // 用于显示节点详情模态框中 
+            base64: "", 
         }
     },
     computed: {
@@ -176,11 +216,11 @@ export default {
             return this.$store.state.total_sensor
         }
     },
-    mixins: [isnull, CreateProject, CreateNode, CreateCamera, SeeNodeDetail, stopBubble, AddDistrict, GetProjectDetailAfterUpdate, GetAddedNode],
+    mixins: [isnull, CreateProject, CreateNode, CreateCamera, SeeNodeDetail, stopBubble, AddDistrict, GetProjectDetailAfterUpdate, GetAddedNode, copyArray, DeleteAddedNode],
     mounted () {
         if (localStorage.getItem("userName") && localStorage.getItem("addedProjectName")) { // 刷新后重新获取页面信息
             this.GetProjectDetailAfterUpdate(localStorage.getItem("addedProjectName")).then((rep) => {
-                console.log("[get-project-detail]:", rep);
+                //console.log("[get-project-detail]:", rep);
                 if (rep.code == 2000) {
                     this.project_name_showing = rep.data.projectName;
                     this.monitor_district_remark_showing = rep.data.districtRemark;
@@ -188,26 +228,36 @@ export default {
                     document.getElementById("indexProPic").style.backgroundSize = "cover";
                     document.getElementById("indexProPic").style.backgroundPosition = "center";
                     document.getElementById("indexProPic").style.backgroundRepeat = "no-repeat";
+                    for (let i = 0; i < rep.data.AddedNodeList.length; i++) { // 将获取到的节点显示出来并加入'已添加节点数added_Node_List'组中
+                        document.getElementById("indexProPic").innerHTML += `<i id="${'node' + rep.data.AddedNodeList[i].nodeId}" style="position:absolute;border-radius:50%;left:${rep.data.AddedNodeList[i].X}px;top:${rep.data.AddedNodeList[i].Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${rep.data.AddedNodeList[i].nodeId}</i>`
+                        this.added_Node_List.push(JSON.parse(JSON.stringify(rep.data.AddedNodeList[i])));
+                    }
+                    this.copyArray(this.added_Node_List, this.added_Node_List_Copy); // 将数组added_Node_List复制到added_Node_List_Copy
+                    console.log("[已添加节点数组added_Node_List]:", this.added_Node_List);
+                    for (let j = 0; j < rep.data.AddedDsitrictList.length; j++) {
+                        this.district_list.push(JSON.parse(JSON.stringify(rep.data.AddedDsitrictList[j])));
+                        setTimeout(() => {
+                            let district_picture_show_div1 = document.getElementById('district_' + rep.data.AddedDsitrictList[j].addDistrictId);
+                            if (district_picture_show_div1 != undefined) {
+                                district_picture_show_div1.style.setProperty("background-image", 'url('+ rep.data.AddedDsitrictList[j].addDistrictPicture +')');
+                                district_picture_show_div1.style.backgroundSize = "cover";
+                                district_picture_show_div1.style.backgroundPosition = "center";
+                                district_picture_show_div1.style.backgroundRepeat = "no-repeat";
+                            }
+                        }, 1000);
+                    }
                     this.project_added_flag = 1;
                 }
             })
-            this.GetAddedNode(localStorage.getItem("addedProjectName")).then((rep) => {
-                console.log("[获取的已添加节点]:", rep);
-                if (rep.code == 2000) {
-                    for (let i = 0; i < rep.data.AddedNodeList.length; i++) {
-                        document.getElementById("indexProPic").innerHTML += `<i id="${'node' + rep.data.AddedNodeList[i].nodeId}" style="position:absolute;border-radius:50%;left:${rep.data.AddedNodeList[i].X}px;top:${rep.data.AddedNodeList[i].Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${rep.data.AddedNodeList[i].nodeId}</i>`
-                    }
-                }
-            })
-            if (localStorage.getItem("addedDiatrictsArray")) {
-                this.district_list = JSON.parse(localStorage.getItem("addedDiatrictsArray"));
-                console.log("[local-district-list]:", this.district_list);
-            }
+            // if (localStorage.getItem("addedDistrictsArray")) {
+            //     this.district_list = JSON.parse(localStorage.getItem("addedDistrictsArray"));
+            //     console.log("[local-district-list]:", this.district_list);
+            // }
         }
         
     },
     watch: {
-        pic_node_show: function(newvalue){
+        pic_node_show: function(newvalue) {
             if (newvalue == 5 || newvalue == 4) {
                 this.oktext = "完成";
             } else {
@@ -216,15 +266,18 @@ export default {
         },
         added_Node_List: { // 监听传感器数值是否需要报警
             handler(newValue, oldValue) {
-                console.log("[进入到监视的函数]");
+                //console.log("[进入到监视的函数]");
                 for (let i = 0; i < newValue.length; i++) {
                     for (let j = 0; j < newValue[i].sensorDetail.length; j++) {
                         if (newValue[i].sensorDetail[j].value != this.added_Node_List_Copy[i].sensorDetail[j].value) {
                             console.log("[有传感器数值改变]:", newValue[i].sensorDetail[j].value);
                             console.log("[改变前]:", this.added_Node_List_Copy[i].sensorDetail[j].value);
-                            if (newValue[i].sensorDetail[j].value > 99) {
+                            if ((newValue[i].sensorDetail[j].type == 'digital' && (newValue[i].sensorDetail[j].value > newValue[i].sensorDetail[j].status.max || newValue[i].sensorDetail[j].value < newValue[i].sensorDetail[j].status.min)) ||
+                            (newValue[i].sensorDetail[j].type == 'switch' && newValue[i].sensorDetail[j].value == 0) ){
                                 let node = document.getElementById('node' + newValue[i].nodeId);
-                                console.log("[报警节点信息]:", node);
+                                let currentTime = new Date();
+                                let temp = '节点（节点名：' + newValue[i].nodeName + '；节点编号：' + newValue[i].nodeId + '）于时间：' + currentTime.toLocaleString() + ' 报警！请点击该节点查看节点详情。';
+                                this.monitor_project_state_showing += temp;
                                 node.style.backgroundColor = "red";
                             }
                         }
@@ -274,13 +327,22 @@ export default {
             }
             else { // 设置成功
                 setTimeout(() => {
-                    const body = {
-                        projectName:this.project_name,
-                        projectLocation:this.project_location,
-                        districtName:this.monitor_district_name,
-                        districtRemark:this.monitor_district_remark,
-                        monitorPicture:"picture"
+                    var formData = new FormData();
+                    formData.append('projectPicture', project_picture_file);
+                    // console.log("[上传项目图片]", formData.get('projectPicture'));
+                    if (formData.append.length < 0) {
+                        console.log("[上传图片失败!]");
+                        return;
                     }
+                    const body = {
+                        projectName: this.project_name,
+                        projectLocation: this.project_location,
+                        districtName: this.monitor_district_name,
+                        districtRemark: this.monitor_district_remark,
+                        monitorPicture: formData
+                    }
+                    //console.log("[formData]:", formData);
+                    console.log("[创建项目的body]:", body);
                     this.CreateProject( body ).then((rep) => {
                         console.log("[createProject_rep]:", rep);
                         if (rep.code == 2000) {
@@ -313,21 +375,21 @@ export default {
             document.getElementById("selectProPic").click();
         },
         selectProPic: function(e){ // 选择工程图
-            let file = e.target.files[0];
-            if (file != undefined) {
-                console.log("[file]:", file);
-                let type = file.type.split('/')[0];
+            project_picture_file = e.target.files[0];
+            if (project_picture_file != undefined) {
+                //console.log("[file]:", project_picture_file);
+                let type = project_picture_file.type.split('/')[0];
                 if (type !='image') {
                     alert('请上传图片');
                     return;
                 }
-                let size = Math.floor(file.size / 1024 / 1024);
+                let size = Math.floor(project_picture_file.size / 1024 / 1024);
                 if (size > 3) {
                     alert('图片大小不得超过3M');
                     return;
                 };
                 let reader = new FileReader();
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(project_picture_file);
                 reader.onload = function () {
                     let project_modal = document.getElementById('show_project_pic');
                     let div = document.createElement('div');
@@ -337,20 +399,26 @@ export default {
                     div.id = "show_project_picture";
                     project_modal.appendChild(div);
                 }
+                
                 this.flag = 1; // 已选择图片的标志
             }
         },
-        delete_project_pic: function(){ // 清除工程图
+        delete_project_pic: function() { // 清除工程图
             let projectPic = document.getElementById('show_project_pic');
             projectPic.removeChild(projectPic.childNodes[0]);
             this.flag = 0;
+        },
+        close_current_project: function() {
+            localStorage.removeItem("addedProjectName");
+            localStorage.removeItem("addedDistrictsArray");
+            location.reload();
         },
         clickPic: function(e) { // 点击图片添加结点
             if (this.project_added_flag == 0) {
                 this.$Message.error("还未添加项目!");
             } else {
-                console.log(e);
-                location = {
+                //console.log(e);
+                Location = {
                     X: e.layerX,
                     Y: e.layerY
                 };
@@ -358,17 +426,14 @@ export default {
                 if(e.target.nodeName === 'I'){ // 当点击的是结点图标时
                     // console.log("[node-id]:", e.target.id);
                     const body = {nodeId: e.target.id};
+                    console.log("[查看的节点信息的编号]:", body);
                     this.SeeNodeDetail(body).then((rep) => {
-                        this.$Modal.info({
-                            title: this.node_name,
-                            content:`<p>结点ID: ${this.node_id} <br/></p>`,
-                            //结点类型: ${rep.data.nodeType} <br/>设置的传感器: ${rep.data.sensors}
-                        })
+                        this.node_Detail = rep.data;
+                        console.log("[节点信息详情]:", this.node_Detail);
+                        this.Node_Detail_Modal = true;
                         console.log("[seeNodeDetail-rep]:", rep);
                     })
                 } else this.pic_modal = true; // 弹出对话框
-                // pic.innerHTML+=`<span class="fas fa-user" style="position:absolute;left:${e.layerX}px;top:${e.layerY}px;"></span>`;
-                // pic.innerHTML+=`<div style="position:absolute;border-radius:50%;left:${e.layerX}px;top:${e.layerY}px;height:10px;width:10px;background:#5cadff;"></div>`
             }
             
         },
@@ -410,9 +475,14 @@ export default {
                         sensor_flag = true;
                     }
                 }
-                this.selected_sensors = this.total_sensor.filter(v => {
+                this.selected_sensors = [];
+                let selected_sensors_copy = [];
+                selected_sensors_copy = this.total_sensor.filter(v => { // 把选中的传感器过滤出来
                     return (v.selected === true);
                 })
+                for (let i = 0; i < selected_sensors_copy.length; i++) {
+                    this.selected_sensors.push(JSON.parse(JSON.stringify(selected_sensors_copy[i])));
+                }
                 if (!sensor_flag) {
                     setTimeout(() => {
                         this.$Notice.error({
@@ -427,9 +497,10 @@ export default {
             } else if (this.pic_node_show == 4) {
                 var sensor_detail_flag = false;
                 for (let i = 0;i < this.selected_sensors.length;i++) {
-                    if (this.selected_sensors[i].type == "digital")
+                    if (this.selected_sensors[i].type == "digital") {
                         if (this.isnull(this.selected_sensors[i].status.max) || this.isnull(this.selected_sensors[i].status.min) || 
                         this.selected_sensors[i].status.min > this.selected_sensors[i].status.max) sensor_detail_flag = true;
+                    }
                 }
                 if (sensor_detail_flag) {
                     setTimeout(() => {
@@ -445,39 +516,18 @@ export default {
                         const body = {
                             nodeId: this.node_id,
                             nodeName: this.node_name,
+                            X: Location.X,
+                            Y: Location.Y,
                             nodeUpdateFrequency: this.node_update_frequence,
                             sensorDetail: this.selected_sensors
                         };
-                        let selected_sensors_copy = [];
-                        let selected_sensor_temp = {
-                            sensorName: "",
-                            type: "",
-                            selected: "",
-                            id: "",
-                            status: "",
-                            value: ""
-                        }
-                        for (let i = 0; i < this.selected_sensors.length; i++) {
-                            selected_sensor_temp.sensorName = this.selected_sensors[i].sensorName;
-                            selected_sensor_temp.type = this.selected_sensors[i].type;
-                            selected_sensor_temp.selected = this.selected_sensors[i].selected;
-                            selected_sensor_temp.id = this.selected_sensors[i].id;
-                            selected_sensor_temp.status = this.selected_sensors[i].status;
-                            selected_sensor_temp.value = this.selected_sensors[i].value;
-                            selected_sensors_copy.push(selected_sensor_temp);
-                        }
-                        let bodyCopy = {
-                            nodeId: this.node_id,
-                            nodeName: this.node_name,
-                            nodeUpdateFrequency: this.node_update_frequence,
-                            sensorDetail: selected_sensors_copy
-                        }
                         this.added_Node_List.push(body);
-                        this.added_Node_List_Copy.push(bodyCopy);
+                        console.log("[已添加的节点]:", this.added_Node_List);
+                        this.copyArray(this.added_Node_List, this.added_Node_List_Copy); // 将数组added_Node_List复制到added_Node_List_Copy
                         this.CreateNode(body).then((rep) => { // 将创建的结点信息传给后台
                             console.log("[createNode_rep]:", rep);
                         })
-                        document.getElementById("indexProPic").innerHTML += `<i id="${'node' + this.node_id}" style="position:absolute;border-radius:50%;left:${location.X}px;top:${location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
+                        document.getElementById("indexProPic").innerHTML += `<i id="${'node' + this.node_id}" style="position:absolute;border-radius:50%;left:${Location.X}px;top:${Location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
                         this.change_sensor_value();
                         this.pic_modal_cancel();
                         this.pic_modal = false;
@@ -497,7 +547,7 @@ export default {
                     })
                     document.getElementById(
                         "indexProPic"
-                    ).innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${location.X}px;top:${location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
+                    ).innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${Location.X}px;top:${Location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
                     this.pic_modal_cancel();
                     this.pic_modal = false;
                 }, 1000);
@@ -549,6 +599,9 @@ export default {
                 this.add_sensor_name = "";
             }
         },
+        districtId: function(id) {
+            return "district_" + id;
+        },
         AddDistricts: function(){ // 添加区域确认键
             if (this.isnull(this.added_district_name) || this.isnull(this.added_district_remark) || this.district_picture_selected_flag == 0) {
                 setTimeout(() => {
@@ -562,20 +615,38 @@ export default {
                 }, 1000);
             } else {
                 setTimeout(() => {
+                    var district_formData = new FormData();
+                    district_formData.append('districtPicture', district_picture_file);
+                    if (district_formData.append.length < 0) {
+                        console.log("[上传图片失败!]");
+                        return;
+                    }
                     const body = {
                         addDistrictId: this.added_district_id,
+                        addDistrictProjectName: this.project_name_showing,
                         addDistrictName: this.added_district_name,
                         addDistrictRemark: this.added_district_remark,
-                        addDistrictPicture: "picture"
+                        addDistrictPicture: district_formData
                     }
+                    console.log("[添加区域的body]:", body);
                     this.AddDistrict(body).then((rep) => {
-                        console.log("[adddistrict-rep]", rep);
+                        console.log("[addedistrict-rep]", rep);
                         if (rep.code == 2000) {
                             this.district_list.push({
-                                addDistrictId: rep.data.addDistrictId,
-                                addDistrictName: rep.data.addDistrictName,
-                                addDistrictRemark: rep.data.addDistrictRemark
+                                addDistrictId: body.addDistrictId,
+                                addDistrictName: body.addDistrictName,
+                                addDistrictRemark: body.addDistrictRemark,
+                                addDistrictPicture: district_formData.get('districtPicture')
                             });
+                            let reader = new FileReader();
+                            reader.readAsDataURL(district_formData.get('districtPicture'));
+                            reader.onload = function () {
+                                let district_picture_show_div = document.getElementById('district_' + body.addDistrictId);
+                                district_picture_show_div.style.setProperty("background-image", 'url('+reader.result+')');
+                                district_picture_show_div.style.backgroundSize = "cover";
+                                district_picture_show_div.style.backgroundPosition = "center";
+                                district_picture_show_div.style.backgroundRepeat = "no-repeat";
+                            }
                             this.added_district_id += 1;
                             this.district_picture_selected_flag = 0;
                             this.addDistrict_modal = false;
@@ -584,7 +655,9 @@ export default {
                             this.added_district_remark = "";
                             this.district_picture_selected_flag = 0;
                             let district_picture = document.getElementById('show_district_picture');
-                            district_picture.parentNode.removeChild(district_picture);
+                            if (district_picture != undefined) {
+                                district_picture.parentNode.removeChild(district_picture);
+                            }
                             // document.getElementById('show_district_picture').style.background = "none";
                         }
                     })
@@ -593,33 +666,41 @@ export default {
             this.$store.commit("set_isAddedDistricts", JSON.stringify(this.district_list));
         },
         CancelAddDistrict: function(){ // 添加区域取消键
-
+            this.added_district_name = "";
+            this.added_district_remark = "";
+            this.district_picture_selected_flag = 0;
+            let district_picture = document.getElementById('show_district_picture');
+            if (district_picture != undefined) {
+                district_picture.parentNode.removeChild(district_picture);
+            }
         },
         import_district_picture: function(){ // 导入区域图片
             document.getElementById('selectDistrictPic').click();
         },
         delete_district_picture: function(){ // 删除区域图片
             let districtPic = document.getElementById('add_district_modal');
-            districtPic.removeChild(districtPic.childNodes[0]);
+            if (districtPic.childNodes[0] != undefined) {
+                districtPic.removeChild(districtPic.childNodes[0]);
+            }
             this.district_picture_selected_flag = 0;
         },
-        selectDisPic: function(e){ 
-            console.log("[进来选择照片的函数]");
-            let file = e.target.files[0];
-            if (file != undefined) {
-                console.log("[district-file]:", file);
-                let type = file.type.split('/')[0];
+        selectDisPic: function(e){ // 选择区域的图片
+            // console.log("[进来选择照片的函数]");
+            district_picture_file = e.target.files[0];
+            if (district_picture_file != undefined) {
+                console.log("[选择的区域图片]:", district_picture_file);
+                let type = district_picture_file.type.split('/')[0];
                 if (type !='image') {
                     alert('请上传图片');
                     return;
                 }
-                let size = Math.floor(file.size / 1024 / 1024);
+                let size = Math.floor(district_picture_file.size / 1024 / 1024);
                 if (size > 3) {
                     alert('图片大小不得超过3M');
                     return;
                 };
                 let reader = new FileReader();
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(district_picture_file);
                 reader.onload = function () {
                     //document.getElementById("show_district_picture").style.background = 'url("' + reader.result + '")';
                     let district_modal = document.getElementById('add_district_modal');
@@ -645,15 +726,32 @@ export default {
             });
             window.open(href, "_blank");
         },
-        change_sensor_value: function() {
-            console.log("[已添加的节点]:", this.added_Node_List);
+        change_sensor_value: function() { // 可删
             this.added_Node_List[0].sensorDetail[0].value = 10;
-            console.log("[修改过后的传感器值]:", this.added_Node_List[0].sensorDetail[0].value);
-            console.log("[修改前的传感器值]:", this.added_Node_List_Copy);
         },
-        change_sensor_value100: function() {
-            console.log("[改变为100]");
+        change_sensor_value100: function() { // 可删
             this.added_Node_List[0].sensorDetail[0].value = 100;
+            this.added_Node_List[1].sensorDetail[1].value = 0;
+        },
+        nodeDetailModal_Ok: function() { // 点击“节点详情模态框”的确定键
+            this.Node_Detail_Modal = false;
+        },
+        deleteAddedNode: function(id) { // 删除节点
+            const body = {ID: id};
+            this.DeleteAddedNode(body).then((rep) => {
+                console.log("[删除节点的rep]:", rep);
+                let i = document.getElementById("node" + id);
+                document.getElementById("indexProPic").removeChild(i);
+                this.Node_Detail_Modal = false;
+                let temp = -1;
+                for (let j = 0; j < this.added_Node_List.length; j++) {
+                    if (this.added_Node_List[j].nodeId == id) {
+                        temp = j;
+                    }
+                }
+                this.added_Node_List.splice(temp, 1);
+            })
+            console.log("[删除后的节点]:", this.added_Node_List);
         }
     }
 }
@@ -703,7 +801,7 @@ export default {
     th,td{
         border:1px solid #dcdee2;
         padding:5px;
-        width:33%;
+        width:24%;
         text-align: center;
     }
     .tipdiv{
@@ -715,7 +813,11 @@ export default {
         position:absolute;
     }
     .district_area_style{
+        width: 100%;
+        min-width: 800px;
         display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
     }
 </style>
 

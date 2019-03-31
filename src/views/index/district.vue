@@ -3,7 +3,7 @@
         <h1>区域名称: {{district_name}}</h1>
         <h3>区域编号: {{district_id}}</h3>
         <div id="districtPic"  @click="clickDistrictPic"  style="cursor:pointer;">
-            <Modal v-model="district_modal" title="添加结点向导">
+            <Modal v-model="district_modal" :mask-closable="false" title="添加结点向导">
                 <div v-show="picture_node_show==1">
                     <p>请选择要添加的监控设备</p>
                     <Button @click="select_camera=false;select_node=true">传感器结点</Button>
@@ -63,14 +63,51 @@
                 </div>
             </Modal>
         </div>
+        <Card>{{monitor_district_state_showing}}</Card>
+        <Modal v-model="Node_Detail_Modal" :mask-closable="false">
+            <div slot="header"><h2>节点详情</h2></div>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点名称：</span>{{node_Detail.nodeName}}</p>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点编号：</span>{{node_Detail.nodeId}}</p>
+            <p><span style="font-size:15px;font-weight:600;color:#464c5b;">节点更新频率：</span>{{node_Detail.nodeUpdateFrequency}}</p>
+            <br/>
+            <table>
+                <tr>
+                    <th>传感器名称</th>
+                    <th>传感器编号</th>
+                    <th>传感器类型</th>
+                    <th>传感器监测阈值</th>
+                    <th>当前值</th>
+                </tr>
+                <tr v-for="(item,index) in node_Detail.sensorDetail" :key="index">
+                    <td>{{item.sensorName}}</td>
+                    <td>{{item.id}}</td>
+                    <td v-if='item.type=="digital"'>数据传感器</td>
+                    <td v-else>开关传感器</td>
+                    <td v-if='item.type=="digital"'>
+                        <label>最小值:</label>{{item.status.min}}<br/>
+                        <label>最大值:</label>{{item.status.max}}
+                    </td>
+                    <td v-else>
+                        <label>传感器状态:</label><span v-if='item.status==0'>OFF</span>
+                        <span v-else>ON</span>
+                    </td>
+                    <td>{{item.value}}</td>
+                </tr>
+            </table>
+            <div slot="footer">
+                <Button @click="deleteAddedNode(node_Detail.nodeId)">删除该节点</Button>
+                <Button type="primary" @click="nodeDetailModal_Ok">确定</Button>
+            </div>
+        </Modal>
+        <Button @click="change_sensor_value100">改变节点传感器的值</Button>
     </div>
 </template>
 
 <script>
-import {isnull} from "../../common/common.js";
+import {isnull, copyArray} from "../../common/common.js";
 import { CreateNode, CreateCamera, SeeNodeDetail} from "../../api/index/project.js";
-import {GetDistrictDetail} from '../../api/index/district.js';
-let location;
+import {GetDistrictDetail, DeleteDistrictAddedNode} from '../../api/index/district.js';
+let Location;
 export default {
     name: "district",
     data () {
@@ -90,6 +127,11 @@ export default {
             add_sensor_name:"",         //要添加的传感器的名称
             selected_sensors:[],  //选中的传感器
             oktext:"下一步",
+            added_Node_List: [], // 已添加的节点数组
+            added_Node_List_Copy: [], // 已添加的节点数组副本
+            monitor_district_state_showing: "", // 传感器状态记录
+            Node_Detail_Modal: false, // 节点详情模态框
+            node_Detail: {}, // 用于显示节点详情模态框中 
         }
     },
     computed: {
@@ -97,7 +139,7 @@ export default {
             return this.$store.state.total_sensor
         }
     },
-    mixins: [ isnull, GetDistrictDetail, CreateNode, CreateCamera, SeeNodeDetail ],
+    mixins: [ isnull, GetDistrictDetail, CreateNode, CreateCamera, SeeNodeDetail, copyArray, DeleteDistrictAddedNode ],
     watch: {
         picture_node_show: function(newvalue){
             if (newvalue == 5 || newvalue == 4) {
@@ -105,6 +147,29 @@ export default {
             } else {
                 this.oktext = "下一步";
             }
+        },
+        added_Node_List: { // 监听传感器数值是否需要报警
+            handler(newValue, oldValue) {
+                console.log("[进入到区域传感器数值监视的函数]");
+                for (let i = 0; i < newValue.length; i++) {
+                    for (let j = 0; j < newValue[i].sensorDetail.length; j++) {
+                        if (newValue[i].sensorDetail[j].value != this.added_Node_List_Copy[i].sensorDetail[j].value) {
+                            console.log("[有传感器数值改变]:", newValue[i].sensorDetail[j].value);
+                            console.log("[改变前]:", this.added_Node_List_Copy[i].sensorDetail[j].value);
+                            if (newValue[i].sensorDetail[j].value > 99) {
+                                let node = document.getElementById('node' + newValue[i].nodeId);
+                                console.log("[报警节点信息]:", node);
+                                let currentTime = new Date();
+                                // let currentTimeTempt = currentTime.toLocaleString();
+                                let temp = '节点（节点名：' + newValue[i].nodeName + '；节点编号：' + newValue[i].nodeId + '）于时间：' + currentTime.toLocaleString() + ' 报警！请点击该节点查看节点详情。';
+                                this.monitor_district_state_showing += temp;
+                                node.style.backgroundColor = "red";
+                            }
+                        }
+                    }
+                }
+            },
+            deep: true
         }
     },
     mounted () {
@@ -112,28 +177,33 @@ export default {
         this.district_id = id;
         this.GetDistrictDetail(id).then((rep) => {
             console.log("[district-detail]:", rep);
-            this.district_name = rep.data.addDistrictName;
-            this.district_remark = rep.data.addDistrictRemark;
-            document.getElementById('districtPic').style.background='url("' +rep.data.addDistrictPicture + '")';
+            this.district_name = rep.data.AddedDistrictName;
+            this.district_remark = rep.data.AddedDistrictRemark;
+            document.getElementById('districtPic').style.background='url("' +rep.data.AddedDistrictPicture + '")';
             document.getElementById("districtPic").style.backgroundSize = "cover";
             document.getElementById("districtPic").style.backgroundPosition = "center";
             document.getElementById("districtPic").style.backgroundRepeat = "no-repeat";
+            for (let i = 0; i < rep.data.AddedNodeList.length; i++) { // 将获取到的节点显示出来并加入'已添加节点数added_Node_List'组中
+                document.getElementById("districtPic").innerHTML += `<i id="${'node' + rep.data.AddedNodeList[i].nodeId}" style="position:absolute;border-radius:50%;left:${rep.data.AddedNodeList[i].X}px;top:${rep.data.AddedNodeList[i].Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${rep.data.AddedNodeList[i].nodeId}</i>`                       
+                this.added_Node_List.push(JSON.parse(JSON.stringify(rep.data.AddedNodeList[i])));
+            }
+            this.copyArray(this.added_Node_List, this.added_Node_List_Copy);
         })
+
     },
     methods:{
         clickDistrictPic: function(e) { // 点击图片添加结点
             console.log(e);
-            location = {
+            Location = {
                 X: e.layerX,
                 Y: e.layerY
             };
             if(e.target.nodeName === 'I'){ // 当点击的是结点图标时
                 // console.log("[node-id]:", e.target.id);
                 this.SeeNodeDetail(e.target.id).then((rep) => {
-                    this.$Modal.info({
-                        title: this.node_name,
-                        content:`<p>结点ID: ${this.node_id} <br/></p>`,
-                    })
+                    this.node_Detail = rep.data;
+                    console.log("[节点信息详情]:", this.node_Detail);
+                    this.Node_Detail_Modal = true;
                     console.log("[seeNodeDetail-rep]:", rep);
                 })
             } else this.district_modal = true; // 弹出对话框
@@ -202,9 +272,14 @@ export default {
                         sensor_flag = true;
                     }
                 }
-                this.selected_sensors = this.total_sensor.filter(v => {
+                this.selected_sensors = [];
+                let selected_sensors_copy = [];
+                selected_sensors_copy = this.total_sensor.filter(v => { // 把选中的传感器过滤出来
                     return (v.selected === true);
                 })
+                for (let i = 0; i < selected_sensors_copy.length; i++) {
+                    this.selected_sensors.push(JSON.parse(JSON.stringify(selected_sensors_copy[i])));
+                }
                 if (!sensor_flag) {
                     setTimeout(() => {
                         this.$Notice.error({
@@ -237,13 +312,19 @@ export default {
                         const body = {
                             nodeId: this.node_id,
                             nodeName: this.node_name,
+                            X: Location.X,
+                            Y: Location.Y,
                             nodeUpdateFrequency: this.node_update_frequence,
                             sensorDetail: this.selected_sensors
                         };
+                        this.added_Node_List.push(body);
+                        console.log("[已添加的节点]:", this.added_Node_List);
+                        this.copyArray(this.added_Node_List, this.added_Node_List_Copy); // 将数组added_Node_List复制到added_Node_List_Copy
                         this.CreateNode(body).then((rep) => { // 将创建的结点信息传给后台
                             console.log("[createNode_rep]:", rep);
                         })
-                        document.getElementById("districtPic").innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${location.X}px;top:${location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
+                        document.getElementById("districtPic").innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${Location.X}px;top:${Location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
+                        this.change_sensor_value();         
                         this.pic_modal_cancel();
                         this.district_modal = false;
                     }, 1000);
@@ -262,7 +343,7 @@ export default {
                     })
                     document.getElementById(
                         "districtPic"
-                    ).innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${location.X}px;top:${location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
+                    ).innerHTML += `<i id="${this.node_id}" style="position:absolute;border-radius:50%;left:${Location.X}px;top:${Location.Y}px;height:20px;width:20px;background:#5cadff;cursor:pointer;">${this.node_id}</i>`
                     this.pic_modal_cancel();
                     this.district_modal = false;
                 }, 1000);
@@ -287,6 +368,33 @@ export default {
                 else this.total_sensor[i].status = {min: 0, max: 1};
             }
         },
+        change_sensor_value: function() { // 可删
+            this.added_Node_List[0].sensorDetail[0].value = 10;
+        },
+        change_sensor_value100: function() { // 可删
+            console.log("[改变为100]");
+            this.added_Node_List[0].sensorDetail[0].value = 100;
+        },
+        nodeDetailModal_Ok: function() { // 点击“节点详情模态框”的确定键
+            this.Node_Detail_Modal = false;
+        },
+        deleteAddedNode: function(id) { // 删除节点
+            const body = {ID: id};
+            this.DeleteDistrictAddedNode(body).then((rep) => {
+                console.log("[删除节点的rep]:", rep);
+                let i = document.getElementById("node" + id);
+                document.getElementById("districtPic").removeChild(i);
+                this.Node_Detail_Modal = false;
+                let temp = -1;
+                for (let j = 0; j < this.added_Node_List.length; j++) {
+                    if (this.added_Node_List[j].nodeId == id) {
+                        temp = j;
+                    }
+                }
+                this.added_Node_List.splice(temp, 1);
+            })
+            console.log("[删除后的节点]:", this.added_Node_List);
+        }
     }
 }
 </script>

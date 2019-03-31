@@ -2,16 +2,28 @@ import service from "../../request.js";
 
 export const GetDistrictDetail = {
     methods: {
-        GetDistrictDetail: (id) => {
+        GetDistrictDetail: (districtId) => {
             return new Promise((resolve, reject) => {
-                service.get('/DistrictDetail', {
+                service.get('/GetDistrictDetail', {
                     params: {
-                        ID: id
+                        districtId: districtId
                     }
                 }).then((rep) => {
                     if (rep.code == 2000) {
                         resolve(rep)
                     }
+                })
+            })
+        }
+    }
+}
+
+export const DeleteDistrictAddedNode = {
+    methods: {
+        DeleteDistrictAddedNode: (body) => {
+            return new Promise((resolve, reject) => {
+                service.post('/DeleteDistrictAddedNode', body).then((rep) => {
+                    resolve(rep)
                 })
             })
         }
