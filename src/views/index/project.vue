@@ -346,18 +346,22 @@ export default {
                     this.CreateProject( body ).then((rep) => {
                         console.log("[createProject_rep]:", rep);
                         if (rep.code == 2000) {
-                            this.project_name_showing = rep.data.projectName;
-                            this.monitor_district_remark_showing = rep.data.districtRemark;
-                            document.getElementById("indexProPic").style.background='url("' + rep.data.projectPicture + '")';
-                            document.getElementById("indexProPic").style.backgroundSize = "cover";
-                            document.getElementById("indexProPic").style.backgroundPosition = "center";
-                            document.getElementById("indexProPic").style.backgroundRepeat = "no-repeat";
+                            this.project_name_showing = body.projectName;
+                            this.monitor_district_remark_showing = body.districtRemark;
+                            let project_reader = new FileReader();
+                            project_reader.readAsDataURL(body.monitorPicture.get('projectPicture'));
+                            project_reader.onload = function () {
+                                document.getElementById("indexProPic").style.setProperty("background-image", 'url('+project_reader.result+')');
+                                document.getElementById("indexProPic").style.backgroundSize = "cover";
+                                document.getElementById("indexProPic").style.backgroundPosition = "center";
+                                document.getElementById("indexProPic").style.backgroundRepeat = "no-repeat";
+                            }
                             this.project_name = this.project_location = this.monitor_district_name = this.monitor_district_remark = "";
                             let project_modal = document.getElementById("show_project_picture");
                             project_modal.parentNode.removeChild(project_modal);
                             this.flag = 0; // 有没有选择项目图片的标志
                             this.project_added_flag = 1; // 已设置了项导
-                            var msg = {"project_name": rep.data.projectName};
+                            var msg = {"project_name": body.projectName};
                             this.$store.commit('set_isAddedProject', msg);
                             console.log("[local-project-name]:", localStorage.getItem("addedProjectName"));
                             this.snp_modal = false;
@@ -737,7 +741,7 @@ export default {
             this.Node_Detail_Modal = false;
         },
         deleteAddedNode: function(id) { // 删除节点
-            const body = {ID: id};
+            const body = {nodeId: id};
             this.DeleteAddedNode(body).then((rep) => {
                 console.log("[删除节点的rep]:", rep);
                 let i = document.getElementById("node" + id);

@@ -379,7 +379,10 @@ export default {
             this.Node_Detail_Modal = false;
         },
         deleteAddedNode: function(id) { // 删除节点
-            const body = {ID: id};
+            const body = {
+                nodeId: id,
+                districtId: this.district_id
+            };
             this.DeleteDistrictAddedNode(body).then((rep) => {
                 console.log("[删除节点的rep]:", rep);
                 let i = document.getElementById("node" + id);

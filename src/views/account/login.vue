@@ -71,11 +71,11 @@ import { mapGetters, mapActions } from "vuex";
                         this.Login(body).then((rep) => {
                             console.log("[login]:",rep);
                             if(rep.code == 2000){
-                                let msg = {"usr_name": rep.data.userName};
+                                let msg = {"usr_name": body.userName};
                                 this.$store.commit('set_isLogin', msg);
                                 let currentTime = new Date().getTime(); // 获取登录成功时的时间
                                 localStorage.setItem("LoginTime", currentTime);
-                                console.log("[登录时间]:", localStorage.getItem("LoginTime"));
+                                //console.log("[登录时间]:", localStorage.getItem("LoginTime"));
                                 this.$Notice.success({
                                     title: "登录成功!",
                                     duration: 1
@@ -96,7 +96,7 @@ import { mapGetters, mapActions } from "vuex";
                 this.Login(body).then((rep) => {
                             console.log("[login]:",rep);
                             if(rep.code == 2000){
-                                let msg = {"usr_name": rep.data.username};
+                                let msg = {"usr_name": body.username};
                                 this.$store.commit('set_isLogin', msg);
                                 let currentTime = new Date().getTime(); // 获取登录成功时的时间
                                 localStorage.setItem("LoginTime", currentTime);
